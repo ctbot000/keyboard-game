@@ -3,6 +3,8 @@
 두벌식 자판을 익히는 브라우저 타자 연습 게임. 빌드 도구도 의존성도 없이 `index.html`
 하나만 열면 실행된다.
 
+**▶ 바로 해보기: <https://ctbot000.github.io/keyboard-game/>**
+
 ## 실행
 
 `index.html` 을 브라우저로 바로 열거나, 로컬 서버를 띄운다.
