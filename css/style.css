@@ -101,6 +101,32 @@ main > section { flex: 1; min-height: 0; display: flex; flex-direction: column; 
   margin: 0 auto;
   justify-content: center;
 }
+#langsel {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 5px;
+  width: fit-content;
+  margin: 0 auto 18px;
+}
+.langbtn {
+  background: none;
+  border: 0;
+  color: var(--dim);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: .15s;
+}
+.langbtn:hover { color: var(--fg); }
+.langbtn.active { background: var(--accent); color: #07141a; }
+
 .lead {
   text-align: center;
   color: var(--dim);
@@ -405,13 +431,29 @@ main > section { flex: 1; min-height: 0; display: flex; flex-direction: column; 
   font-size: 11px;
   color: var(--dim);
 }
-.kb-key.wide .kb-en {
+/* 영문 연습: 자모를 감추고 알파벳을 키 한가운데 크게 */
+#keyboard.lang-en .kb-kr,
+#keyboard.lang-en .kb-sh { display: none; }
+#keyboard.lang-en .kb-en {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.kb-key.wide .kb-en,
+#keyboard.lang-en .kb-key.wide .kb-en {
   position: static;
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
   font-size: 11px;
+  font-weight: 400;
   color: #6b7794;
 }
 .kb-key.home::after {
@@ -464,6 +506,11 @@ main > section { flex: 1; min-height: 0; display: flex; flex-direction: column; 
   box-shadow: none;
 }
 .kb-key.bad .kb-kr, .kb-key.bad .kb-en, .kb-key.bad .kb-sh { color: #2a0009; }
+
+/* 영문 모드는 .kb-en 색을 id 선택자로 잡으므로 강조 색을 다시 지정한다 */
+#keyboard.lang-en .kb-key.next .kb-en { color: #07141a; }
+#keyboard.lang-en .kb-key.next-shift .kb-en { color: #0a0d1c; font-weight: 700; }
+#keyboard.lang-en .kb-key.bad .kb-en { color: #2a0009; }
 
 /* ───────────────────────────────── 결과 ───────────────────────────────── */
 #screen-result {

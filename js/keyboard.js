@@ -137,11 +137,17 @@
     if (root) root.classList.toggle('show-fingers', !!on);
   }
 
+  /* 영문 연습에서는 한글 자모를 감추고 알파벳을 크게 보여 준다 */
+  function setLang(lang) {
+    if (root) root.classList.toggle('lang-en', lang === 'en');
+  }
+
   global.Keyboard = {
     render: render,
     hint: hint,
     clearHint: clearHint,
     flash: flash,
-    setFingerColors: setFingerColors
+    setFingerColors: setFingerColors,
+    setLang: setLang
   };
 })(window);

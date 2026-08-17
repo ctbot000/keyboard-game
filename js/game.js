@@ -49,8 +49,25 @@
 
   /* ------------------------------------------------------------ 기록 저장 */
   function loadRecords() {
-    try { return JSON.parse(localStorage.getItem(RECORD_KEY)) || {}; }
+    var r;
+    try { r = JSON.parse(localStorage.getItem(RECORD_KEY)) || {}; }
     catch (e) { return {}; }
+    /* 예전 기록은 키가 'mode:opt' 였고 타수 필드 이름이 cpm 이었다.
+       언어 구분이 생겼으니 한글 기록으로 옮기고 필드 이름도 맞춘다 */
+    Object.keys(r).forEach(function (k) {
+      if (k.split(':').length === 2) {
+        if (!r['ko:' + k]) r['ko:' + k] = r[k];
+        delete r[k];
+      }
+    });
+    Object.keys(r).forEach(function (k) {
+      var v = r[k];
+      if (v && v.speed === undefined && v.cpm !== undefined) {
+        v.speed = v.cpm;
+        delete v.cpm;
+      }
+    });
+    return r;
   }
   function saveRecord(key, value) {
     var r = loadRecords();
@@ -89,6 +106,7 @@
   /* --------------------------------------------------------------- 상태 */
   var S = {
     screen: 'menu',
+    lang: 'ko',      // ko | en
     mode: null,      // drill | word | sentence | fall
     opt: null,
     optLabel: '',
@@ -112,6 +130,9 @@
     fall: null
   };
 
+  /* 지금 언어의 자료 묶음 */
+  function L() { return Data.LANG[S.lang]; }
+
   /* -------------------------------------------------------------- 화면 */
   function show(name) {
     S.screen = name;
@@ -127,17 +148,17 @@
     S.opt = optKey;
 
     if (mode === 'drill') {
-      var d = Data.DRILL[optKey];
+      var d = L().DRILL[optKey];
       S.optLabel = d.label;
-      S.items = chunk(pick(d.jamo, 40), 10);   // 낱자 10개씩 4줄
+      S.items = chunk(pick(d.chars, 40), 10);  // 낱자 10개씩 4줄
       $('#play-hint').textContent = d.hint + ' · 틀린 키는 입력되지 않습니다';
     } else if (mode === 'word') {
-      var w = Data.WORDS[optKey];
+      var w = L().WORDS[optKey];
       S.optLabel = w.label;
       S.items = pick(w.list, 20);
       $('#play-hint').textContent = w.hint + ' · 낱말을 다 치면 자동으로 넘어갑니다';
     } else {
-      var t = Data.SENTENCES[optKey];
+      var t = L().SENTENCES[optKey];
       S.optLabel = t.label;
       S.items = pick(t.list, 5);
       $('#play-hint').textContent = t.hint + ' · 띄어쓰기와 문장부호까지 그대로 칩니다';
@@ -150,7 +171,7 @@
     S.startAt = 0;
     S.running = true;
 
-    $('#play-mode').textContent = modeName(mode) + ' · ' + S.optLabel;
+    $('#play-mode').textContent = L().label + ' · ' + modeName(mode) + ' · ' + S.optLabel;
     $('#field-practice').classList.remove('hidden');
     $('#field-fall').classList.add('hidden');
 
@@ -297,17 +318,25 @@
     var ms = S.startAt ? Date.now() - S.startAt : 0;
     var min = ms / 60000;
     /* 0.5초는 지나야 타수를 낸다. 안 그러면 첫 타에서 터무니없는 값이 나온다 */
-    var cpm = ms >= 500 ? Math.round(strokes / min) : 0;
+    var fast = ms >= 500;
+    /* 한글은 낱자 타수(타/분), 영문은 관행대로 5글자를 한 낱말로 보는 WPM */
+    var speed = !fast ? 0
+      : S.lang === 'en' ? Math.round(strokes / 5 / min)
+      : Math.round(strokes / min);
     var acc = S.typedStrokes > 0
       ? Math.round(((S.typedStrokes - S.errorStrokes) / S.typedStrokes) * 100)
       : 100;
-    return { cpm: cpm, acc: acc, ms: ms, strokes: strokes };
+    return { speed: speed, acc: acc, ms: ms, strokes: strokes };
   }
 
   function tick() {
     if (S.mode === 'fall') return;
-    var s = stats();
-    $('#stat-cpm').textContent = s.cpm;
+    showStats(stats());
+  }
+
+  function showStats(s) {
+    $('#stat-speed').textContent = s.speed;
+    $('#stat-speed-unit').textContent = L().speedUnit;
     $('#stat-acc').textContent = s.acc + '%';
     $('#stat-time').textContent = fmtTime(s.ms);
   }
@@ -320,20 +349,22 @@
     Sound.done();
 
     var s = stats();
-    var key = S.mode + ':' + S.opt;
+    var key = S.lang + ':' + S.mode + ':' + S.opt;
     var rec = loadRecords()[key];
-    var best = !rec || s.cpm > rec.cpm;
-    if (best) saveRecord(key, { cpm: s.cpm, acc: s.acc });
+    var best = !rec || s.speed > rec.speed;
+    if (best) saveRecord(key, { speed: s.speed, acc: s.acc });
 
-    $('#result-title').textContent = modeName(S.mode) + ' · ' + S.optLabel + ' 완료';
+    var unit = L().speedUnit;
+    $('#result-title').textContent =
+      L().label + ' · ' + modeName(S.mode) + ' · ' + S.optLabel + ' 완료';
     $('#result-grid').innerHTML =
-      card('타수', s.cpm, '타/분') +
+      card(S.lang === 'en' ? '속도' : '타수', s.speed, unit) +
       card('정확도', s.acc + '%', '') +
       card('걸린 시간', fmtTime(s.ms), '') +
       card('오타', S.errorStrokes, '번');
     $('#result-note').textContent = best
       ? '🎉 최고 기록을 세웠습니다!'
-      : (rec ? '최고 기록: ' + rec.cpm + '타 / 정확도 ' + rec.acc + '%' : '');
+      : (rec ? '최고 기록: ' + rec.speed + ' ' + unit + ' / 정확도 ' + rec.acc + '%' : '');
     $('#result-note').classList.toggle('hl', !!best);
     show('result');
   }
@@ -369,7 +400,7 @@
       raf: null
     };
 
-    $('#play-mode').textContent = '낱말 떨어뜨리기 · ' + cfg.label;
+    $('#play-mode').textContent = L().label + ' · 낱말 떨어뜨리기 · ' + cfg.label;
     $('#play-hint').textContent = cfg.hint + ' · 떨어지는 낱말을 쳐서 없애세요 (Esc 로 입력 취소)';
     $('#field-practice').classList.add('hidden');
     $('#field-fall').classList.remove('hidden');
@@ -386,7 +417,8 @@
   function spawnWord() {
     var f = S.fall;
     var field = $('#fall-words');
-    var text = Data.FALL_WORDS[Math.floor(Math.random() * Data.FALL_WORDS.length)];
+    var pool = L().FALL_WORDS;
+    var text = pool[Math.floor(Math.random() * pool.length)];
 
     var el = document.createElement('div');
     el.className = 'fword';
@@ -448,12 +480,7 @@
       }
     }
 
-    if (S.startAt) {
-      var s = stats();
-      $('#stat-cpm').textContent = s.cpm;
-      $('#stat-acc').textContent = s.acc + '%';
-      $('#stat-time').textContent = fmtTime(s.ms);
-    }
+    if (S.startAt) showStats(stats());
 
     f.raf = requestAnimationFrame(fallLoop);
   }
@@ -580,12 +607,12 @@
     Sound.over();
 
     var s = stats();
-    var key = 'fall:' + S.opt;
+    var key = S.lang + ':fall:' + S.opt;
     var rec = loadRecords()[key];
     var best = !rec || f.score > rec.score;
     if (best) saveRecord(key, { score: f.score, level: f.level });
 
-    $('#result-title').textContent = '게임 종료 · ' + S.optLabel;
+    $('#result-title').textContent = L().label + ' · 게임 종료 · ' + S.optLabel;
     $('#result-grid').innerHTML =
       card('점수', f.score, '점') +
       card('레벨', f.level, '') +
@@ -637,12 +664,16 @@
       return;
     }
 
-    var jamo = Hangul.keyToJamo(e.code, e.shiftKey);
-    if (jamo === null) {
+    var jamo;
+    if (S.lang === 'en') {
+      /* 영문은 조합이 없다. 물리 키를 그대로 글자로 바꾼다 */
+      jamo = Hangul.keyToChar(e.code, e.shiftKey);
+    } else {
+      jamo = Hangul.keyToJamo(e.code, e.shiftKey);
       /* 문장 연습의 문장부호처럼 한글이 아닌 키 */
-      if (S.mode === 'sentence') jamo = Hangul.keyToChar(e.code, e.shiftKey);
-      if (jamo === null) return;
+      if (jamo === null && S.mode === 'sentence') jamo = Hangul.keyToChar(e.code, e.shiftKey);
     }
+    if (jamo === null) return;
     if (S.mode === 'fall' && jamo === ' ') { e.preventDefault(); return; }
 
     e.preventDefault();
@@ -651,69 +682,62 @@
   });
 
   /* ------------------------------------------------------------ 메뉴 */
-  function buildMenu() {
-    var menu = $('#modes');
+  function renderMenu() {
+    var d = L();
     var groups = [
       { mode: 'drill', icon: '⌨️', title: '자리 연습',
         desc: '자판 위치를 손에 익힙니다. 틀린 키는 입력되지 않아요.',
-        opts: Object.keys(Data.DRILL).map(function (k) {
-          return { key: k, label: Data.DRILL[k].label };
-        }) },
+        src: d.DRILL },
       { mode: 'word', icon: '📝', title: '낱말 연습',
         desc: '낱말 20개를 칩니다. 다 치면 자동으로 다음 낱말로 넘어갑니다.',
-        opts: Object.keys(Data.WORDS).map(function (k) {
-          return { key: k, label: Data.WORDS[k].label };
-        }) },
+        src: d.WORDS },
       { mode: 'sentence', icon: '📖', title: '문장 연습',
         desc: '띄어쓰기와 문장부호까지 포함한 문장 5개를 칩니다.',
-        opts: Object.keys(Data.SENTENCES).map(function (k) {
-          return { key: k, label: Data.SENTENCES[k].label };
-        }) },
+        src: d.SENTENCES },
       { mode: 'fall', icon: '🎮', title: '낱말 떨어뜨리기',
         desc: '떨어지는 낱말을 쳐서 없애세요. 바닥에 닿으면 생명이 줄어듭니다.',
-        opts: Object.keys(Data.FALL).map(function (k) {
-          return { key: k, label: Data.FALL[k].label };
-        }) }
+        src: Data.FALL }
     ];
 
-    menu.innerHTML = groups.map(function (g) {
+    $('#modes').innerHTML = groups.map(function (g) {
       return '<div class="card">' +
         '<div class="card-head"><span class="icon">' + g.icon + '</span>' +
         '<h3>' + g.title + '</h3></div>' +
         '<p>' + g.desc + '</p>' +
-        '<div class="chips">' + g.opts.map(function (o) {
-          return '<button class="chip" data-mode="' + g.mode + '" data-opt="' + o.key + '">' +
-                 o.label + '</button>';
+        '<div class="chips">' + Object.keys(g.src).map(function (k) {
+          return '<button class="chip" data-mode="' + g.mode + '" data-opt="' + k + '">' +
+                 escapeHtml(g.src[k].label) + '</button>';
         }).join('') + '</div>' +
         '<div class="rec" data-mode="' + g.mode + '"></div>' +
         '</div>';
     }).join('');
 
-    menu.addEventListener('click', function (e) {
-      var btn = e.target.closest('.chip');
-      if (!btn) return;
-      Sound.ensure();
-      var mode = btn.dataset.mode;
-      if (mode === 'fall') startFall(btn.dataset.opt);
-      else startPractice(mode, btn.dataset.opt);
+    $('#lead').innerHTML = d.lead;
+    $('#lang-badge').textContent = d.badge;
+    document.querySelectorAll('.langbtn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.lang === S.lang);
     });
+    Keyboard.setLang(S.lang);
+    renderRecords();
   }
 
   function renderRecords() {
     var recs = loadRecords();
+    var d = L();
     document.querySelectorAll('.rec').forEach(function (el) {
       var mode = el.dataset.mode;
+      var prefix = S.lang + ':' + mode + ':';
+      var src = mode === 'fall' ? Data.FALL
+              : mode === 'word' ? d.WORDS
+              : mode === 'sentence' ? d.SENTENCES : d.DRILL;
       var parts = [];
       Object.keys(recs).forEach(function (k) {
-        if (k.indexOf(mode + ':') !== 0) return;
-        var opt = k.split(':')[1];
-        var src = mode === 'fall' ? Data.FALL
-                : mode === 'word' ? Data.WORDS
-                : mode === 'sentence' ? Data.SENTENCES : Data.DRILL;
+        if (k.indexOf(prefix) !== 0) return;
+        var opt = k.slice(prefix.length);
         var label = src[opt] ? src[opt].label : opt;
         parts.push(label + ' ' + (mode === 'fall'
           ? recs[k].score + '점'
-          : recs[k].cpm + '타'));
+          : recs[k].speed + ' ' + d.speedUnit));
       });
       el.textContent = parts.length ? '최고 기록 · ' + parts.join(' / ') : '';
     });
@@ -723,8 +747,25 @@
   function init() {
     Keyboard.render($('#keyboard'));
     Keyboard.setFingerColors(true);
-    buildMenu();
-    renderRecords();
+
+    /* 카드는 언어를 바꿀 때마다 다시 그리므로, 클릭은 컨테이너에 한 번만 건다 */
+    $('#modes').addEventListener('click', function (e) {
+      var btn = e.target.closest('.chip');
+      if (!btn) return;
+      Sound.ensure();
+      var mode = btn.dataset.mode;
+      if (mode === 'fall') startFall(btn.dataset.opt);
+      else startPractice(mode, btn.dataset.opt);
+    });
+
+    $('#langsel').addEventListener('click', function (e) {
+      var btn = e.target.closest('.langbtn');
+      if (!btn || btn.dataset.lang === S.lang) return;
+      S.lang = btn.dataset.lang;
+      renderMenu();
+    });
+
+    renderMenu();
 
     $('#btn-menu').addEventListener('click', quit);
     $('#btn-again').addEventListener('click', function () {

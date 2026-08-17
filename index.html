@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>한글 타자 연습</title>
+<title>타자 연습 — 한글 두벌식 · 영문 QWERTY</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230d1117'/><text x='32' y='45' font-size='38' text-anchor='middle' fill='%234dd6c1' font-family='sans-serif'>한</text></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <header id="topbar">
-  <h1>한글 타자 연습 <span class="sub">두벌식</span></h1>
+  <h1>타자 연습 <span class="sub" id="lang-badge">두벌식</span></h1>
   <div class="tools">
     <button id="btn-finger" class="tbtn" title="손가락 구역 색 표시">✋ 손가락</button>
     <button id="btn-sound" class="tbtn" title="소리 켜기/끄기">🔊</button>
@@ -22,10 +22,11 @@
 
   <!-- ─────────────────────────────── 메뉴 ─────────────────────────────── -->
   <section id="screen-menu">
-    <p class="lead">
-      한글 조합을 게임이 직접 처리합니다.
-      <strong>한/영 입력기 상태와 상관없이</strong> 자판 위치만 맞으면 그대로 입력돼요.
-    </p>
+    <div id="langsel">
+      <button class="langbtn active" data-lang="ko">한글 두벌식</button>
+      <button class="langbtn" data-lang="en">English QWERTY</button>
+    </div>
+    <p class="lead" id="lead"></p>
     <div id="modes"></div>
     <p class="foot">Esc — 그만두기 · Backspace — 지우기</p>
   </section>
@@ -39,7 +40,7 @@
       </div>
       <div class="hud-right">
         <div class="stat"><b id="progress">–</b><span>진행</span></div>
-        <div class="stat"><b id="stat-cpm">0</b><span>타/분</span></div>
+        <div class="stat"><b id="stat-speed">0</b><span id="stat-speed-unit">타/분</span></div>
         <div class="stat"><b id="stat-acc">100%</b><span>정확도</span></div>
         <div class="stat"><b id="stat-time">0:00</b><span>시간</span></div>
       </div>
